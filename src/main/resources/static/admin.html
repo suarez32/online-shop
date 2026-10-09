@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>单品小铺 · 卖家后台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%234f46e5'/%3E%3Cpath d='M20 26h24l-3 22a4 4 0 0 1-4 4H27a4 4 0 0 1-4-4l-3-22z' fill='white'/%3E%3Cpath d='M24 26v-4a8 8 0 0 1 16 0v4' fill='none' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="admin.html">
+      <span class="brand-mark">铺</span>
+      <span class="brand-text">
+        <strong>单品小铺</strong>
+        <small>卖家后台</small>
+      </span>
+    </a>
+    <div class="header-actions" id="header-actions" hidden>
+      <span class="welcome">你好，<b id="seller-name">卖家</b></span>
+      <a class="btn btn-ghost btn-sm" href="index.html" target="_blank">买家端</a>
+      <button type="button" class="btn btn-ghost btn-sm" id="refresh-btn">刷新</button>
+      <button type="button" class="btn btn-ghost-danger btn-sm" id="logout-btn">退出登录</button>
+    </div>
+  </div>
+</header>
+
+<main class="container main">
+
+  <!-- ============ 登录视图 ============ -->
+  <section class="card auth-card" id="login-view">
+    <h2 class="card-title">卖家登录</h2>
+    <p class="card-sub">登录后可发布商品、查看购买意向</p>
+    <form id="login-form" novalidate>
+      <div class="form-field">
+        <label for="login-username">用户名</label>
+        <input class="input" id="login-username" maxlength="50" placeholder="请输入用户名" autocomplete="username">
+        <p class="field-error" id="login-username-error" hidden></p>
+      </div>
+      <div class="form-field">
+        <label for="login-password">密码</label>
+        <input class="input" id="login-password" type="password" maxlength="64" placeholder="请输入密码" autocomplete="current-password">
+        <p class="field-error" id="login-password-error" hidden></p>
+      </div>
+      <div class="banner banner-error" id="login-error" hidden></div>
+      <button type="submit" class="btn btn-primary btn-block" id="login-submit">登 录</button>
+    </form>
+    <p class="auth-tip">默认账号以后端配置为准，详见《构建与部署手册》</p>
+  </section>
+
+  <!-- ============ 后台视图 ============ -->
+  <div id="dashboard-view" hidden>
+
+    <div class="banner banner-info" id="offline-tip" hidden>
+      未连接到后端服务，当前为<b>静态骨架模式</b>：仅展示页面结构，接口联调后自动加载真实数据。
+    </div>
+
+    <div class="card">
+      <details class="demo">
+        <summary>评审演示 · 五步闭环流程（点击展开对照）</summary>
+        <ol>
+          <li><b>卖家登录</b>：本页完成（POST /api/seller/login）</li>
+          <li><b>发布商品</b>：左下方表单（POST /api/seller/products）</li>
+          <li><b>买家看到商品</b>：新开「买家端」页（GET /api/product）</li>
+          <li><b>买家提交意向</b>：买家端填写姓名电话，获得口令码（POST /api/intents）</li>
+          <li><b>卖家看到意向列表</b>：回到本页点「刷新」（GET /api/seller/overview）</li>
+        </ol>
+      </details>
+    </div>
+
+    <div class="dash-grid">
+      <!-- 左列：商品 -->
+      <div>
+        <section class="card">
+          <h3 class="card-title">当前在售商品</h3>
+          <div id="admin-product-loading">
+            <div class="skeleton sk-product"></div>
+          </div>
+          <div id="admin-product-empty" class="empty-state" hidden>
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3.3 8.3L12 13l8.7-4.7"/><path d="M12 13v9"/>
+            </svg>
+            <p>当前没有在售商品</p>
+            <p style="font-size:12.5px;color:var(--text-muted)">在下方发布一件新商品，就可以开张啦</p>
+          </div>
+          <div id="admin-product-body" hidden>
+            <div class="mini-product">
+              <img id="admin-product-image" alt="商品图片">
+              <div class="mini-product-info">
+                <div class="mini-product-name">
+                  <span id="admin-product-name"></span>
+                  <span id="admin-product-status"></span>
+                </div>
+                <p class="mini-product-desc" id="admin-product-desc"></p>
+                <div class="mini-product-price"><span class="price-symbol">&yen;</span><span id="admin-product-price"></span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3 class="card-title">发布新商品</h3>
+          <p class="card-sub">小铺规则：一次只卖一件，这件售出后才能发布下一件</p>
+          <div id="publish-blocked" class="banner banner-warning" hidden>
+            已有商品在售或交易中，按「卖掉一件、再做一件」的规则，暂不能发布新商品。
+          </div>
+          <form id="publish-form" novalidate>
+            <fieldset id="publish-fields">
+              <div class="form-field">
+                <label for="pub-name">商品名称 <span style="color:var(--danger)">*</span></label>
+                <input class="input" id="pub-name" maxlength="100" placeholder="给商品起个响亮的名字">
+                <p class="field-error" id="pub-name-error" hidden></p>
+                <p class="field-counter" id="pub-name-counter">0 / 100</p>
+              </div>
+              <div class="form-field">
+                <label for="pub-desc">商品描述</label>
+                <textarea id="pub-desc" maxlength="2000" placeholder="规格、成色、使用情况等，帮助买家了解商品"></textarea>
+                <p class="field-counter" id="pub-desc-counter">0 / 2000</p>
+              </div>
+              <div class="form-row">
+                <div class="form-field">
+                  <label for="pub-price">价格（元）<span style="color:var(--danger)">*</span></label>
+                  <input class="input" id="pub-price" inputmode="decimal" placeholder="0.00" maxlength="12">
+                  <p class="field-error" id="pub-price-error" hidden></p>
+                </div>
+                <div class="form-field">
+                  <label>商品图片（选填）</label>
+                  <div class="upload-area">
+                    <img class="upload-preview" id="pub-image-preview" alt="图片预览" hidden>
+                    <div class="upload-info">
+                      <div class="upload-actions">
+                        <button type="button" class="btn btn-ghost btn-sm" id="pub-image-pick">选择图片</button>
+                        <button type="button" class="btn btn-ghost-danger btn-sm" id="pub-image-remove" hidden>移除</button>
+                      </div>
+                      <p class="upload-hint">支持 JPG / PNG，不超过 5MB，最多 1 张；不传则使用占位图</p>
+                    </div>
+                  </div>
+                  <input type="file" id="pub-image" accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+                </div>
+              </div>
+              <button type="submit" class="btn btn-primary btn-block" id="publish-submit">发布商品</button>
+            </fieldset>
+          </form>
+        </section>
+      </div>
+
+      <!-- 右列：意向列表 -->
+      <div>
+        <section class="card">
+          <div class="card-title-row">
+            <h3 class="card-title">购买意向列表</h3>
+            <span class="card-sub" id="queue-count" style="margin:0"></span>
+          </div>
+          <div id="queue-loading">
+            <div class="skeleton sk-line"></div>
+            <div class="skeleton sk-line short"></div>
+            <div class="skeleton sk-line"></div>
+          </div>
+          <div id="queue-empty" class="empty-state" hidden>
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10z"/>
+            </svg>
+            <p>暂无购买意向</p>
+            <p style="font-size:12.5px;color:var(--text-muted)">把买家端页面分享出去，等意向飞过来</p>
+          </div>
+          <div id="queue-body" hidden>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>位次</th>
+                    <th>姓名</th>
+                    <th>联系电话</th>
+                    <th>状态</th>
+                    <th>提交时间</th>
+                  </tr>
+                </thead>
+                <tbody id="queue-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <p class="queue-note">列表按提交时间正序排列；为保护买家隐私，口令码不会展示给卖家。</p>
+        </section>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer class="site-footer">
+  第 7 组 · 在线购物系统 · 迭代 1（MVP）· 卖家后台
+</footer>
+
+<script src="js/common.js"></script>
+<script src="js/api.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
