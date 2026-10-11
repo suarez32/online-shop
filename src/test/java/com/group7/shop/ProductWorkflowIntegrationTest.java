@@ -33,6 +33,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -262,6 +263,20 @@ class ProductWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.product.status").value("ON_SALE"))
                 .andExpect(jsonPath("$.data.intentStatus").value("FAILED"));
+    }
+
+    @Test
+    void historyEndpointKeepsProductFieldsAtItemLevel() throws Exception {
+        ProductView product = publish("历史商品", "接口契约", "88.00");
+        productService.offshelf(product.id());
+
+        mockMvc.perform(get("/api/seller/history"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.items[0].id").value(product.id()))
+                .andExpect(jsonPath("$.data.items[0].name").value("历史商品"))
+                .andExpect(jsonPath("$.data.items[0].historyType").value("MANUAL"))
+                .andExpect(jsonPath("$.data.items[0].product").doesNotExist());
     }
 
     private ProductView publish(String name, String description, String price) {
