@@ -1,16 +1,28 @@
 package com.group7.shop.service;
 
+import com.group7.shop.entity.Intent;
+import com.group7.shop.entity.IntentStatus;
+import com.group7.shop.repository.IntentRepository;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 /**
  * 商品状态改变时的跨域协作点。
- * 集成时应由意向/交易模块实现队列意向清理逻辑。
+ * 手动下架后将剩余排队意向标记失败，避免留下不可处理的队列记录。
  */
 @Component
 public class ProductLifecycleListener {
+    private final IntentRepository intentRepository;
+
+    public ProductLifecycleListener(IntentRepository intentRepository) {
+        this.intentRepository = intentRepository;
+    }
+
     public void onProductOffShelf(Long productId) {
-        // TODO 集成华天遥/周琳皓的 IntentService：
-        // 商品手动下架后，将该商品剩余 WAITING 意向标记为 FAILED。
-        // 当前实现不假装已经更新了 Intent 表。
+        List<Intent> waiting = intentRepository
+                .findByProductIdAndStatusOrderBySubmittedAtAscIdAsc(productId, IntentStatus.WAITING);
+        waiting.forEach(Intent::markFailed);
+        intentRepository.saveAll(waiting);
     }
 }
