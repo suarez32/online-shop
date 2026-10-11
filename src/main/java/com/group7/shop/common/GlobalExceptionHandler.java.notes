@@ -1,0 +1,4 @@
+补充说明：
+- X-Token 未登录错误应由李宇轩的认证拦截器返回同样的 Result 格式与 HTTP 401。
+- Controller 不自行解析 X-Token，避免与账号域重复。
+- 业务状态冲突返回 HTTP 409；Wiki 明确的业务输入冲突提示使用 HTTP 400。
