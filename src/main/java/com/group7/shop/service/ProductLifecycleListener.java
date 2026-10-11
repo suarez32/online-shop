@@ -4,13 +4,20 @@ import org.springframework.stereotype.Component;
 
 /**
  * 商品状态改变时的跨域协作点。
- * 集成时应由意向/交易模块实现队列意向清理逻辑。
+ * 由意向域（负责人：华天遥）实现：商品手动下架后，剩余 WAITING 意向全部置为 FAILED（终态留痕）。
+ * 「交易成功后其余意向置失败」由交易域（周琳皓）的 result 接口在标记该意向 TRADED 后调用
+ * IntentService.failAllWaiting(productId) 完成。
  */
 @Component
 public class ProductLifecycleListener {
+
+    private final IntentService intentService;
+
+    public ProductLifecycleListener(IntentService intentService) {
+        this.intentService = intentService;
+    }
+
     public void onProductOffShelf(Long productId) {
-        // TODO 集成华天遥/周琳皓的 IntentService：
-        // 商品手动下架后，将该商品剩余 WAITING 意向标记为 FAILED。
-        // 当前实现不假装已经更新了 Intent 表。
+        intentService.failAllWaiting(productId);
     }
 }
