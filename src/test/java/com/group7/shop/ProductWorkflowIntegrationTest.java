@@ -28,6 +28,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
@@ -285,6 +286,6 @@ class ProductWorkflowIntegrationTest {
     }
 
     private Intent waitingIntent(Long productId, String name, String phone, String hash) {
-        return intentRepository.save(new Intent(productId, name, phone, hash));
+        return intentRepository.save(new Intent(productId, name, phone, hash, Instant.now()));
     }
 }

@@ -36,7 +36,7 @@ public class ProductTransactionService {
             throw BusinessException.conflict("仅在售商品可以选择买家");
         }
 
-        Intent intent = intentRepository.findByIdForUpdate(intentId)
+        Intent intent = intentRepository.findById(intentId)
                 .orElseThrow(() -> BusinessException.notFound("购买意向不存在"));
         if (!productId.equals(intent.getProductId())) {
             throw BusinessException.badRequest("购买意向不属于该商品");
@@ -46,7 +46,7 @@ public class ProductTransactionService {
         }
 
         product.freezeForTrade();
-        intent.startTrade();
+        intent.markInTrade();
         Product savedProduct = productRepository.save(product);
         Intent savedIntent = intentRepository.save(intent);
         return TransactionView.from(ProductView.from(savedProduct), savedIntent);
@@ -64,7 +64,8 @@ public class ProductTransactionService {
             throw BusinessException.conflict("商品当前没有进行中的交易");
         }
 
-        Intent selected = intentRepository.findActiveTradeForUpdate(productId)
+        Intent selected = intentRepository.findByProductIdAndStatus(productId, IntentStatus.IN_TRADE)
+                .stream().findFirst()
                 .orElseThrow(() -> BusinessException.conflict("商品没有对应的交易中意向"));
 
         if (result == TradeResult.SUCCESS) {
