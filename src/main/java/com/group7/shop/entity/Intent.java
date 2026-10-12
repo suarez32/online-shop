@@ -7,92 +7,103 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import jakarta.persistence.Version;
 
 import java.time.Instant;
 
 /**
- * 买家购买意向。口令码只存哈希（codeHash），明文仅在提交响应返回一次。
- * 本实体为冻结数据模型的一部分；写侧（提交/查询/修改/撤销）由意向域（华天遥）实现，
- * 账号与后台域（李宇轩）仅按 productId + submittedAt 只读聚合到后台总览。
+ * 买家购买意向（意向域负责人：华天遥）。
+ * 口令码只存哈希（codeHash，SHA-256，全库唯一），明文仅在提交响应返回一次。
+ * 字段与 Wiki《接口设计》数据模型一致：id, productId, name, phone, codeHash, status, submittedAt。
+ * 账号与后台域（李宇轩）按 productId + submittedAt 只读聚合到后台总览，融合时保留其只读兼容性。
  */
 @Entity
-@Table(name = "intents")
+@Table(name = "intents", indexes = {
+        @Index(name = "idx_intents_product_status", columnList = "product_id,status"),
+        @Index(name = "uk_intents_code_hash", columnList = "code_hash", unique = true)
+})
 public class Intent {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    /** 所属商品 id。按 Wiki 约定不建 JPA 关联，跨模块仅以 id 解耦。 */
+    @Column(name = "product_id", nullable = false)
     private Long productId;
 
-    @Column(nullable = false, length = 64)
+    @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(nullable = false, length = 32)
+    @Column(nullable = false, length = 50)
     private String phone;
 
-    /** 口令码哈希，仅存哈希；明文只在提交响应返回一次。 */
-    @Column(nullable = false, length = 64)
+    /** 口令码的 SHA-256 十六进制值，唯一索引兜底防止并发重复。 */
+    @Column(name = "code_hash", nullable = false, length = 64)
     private String codeHash;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private IntentStatus status = IntentStatus.WAITING;
 
-    @Column(nullable = false)
+    @Column(name = "submitted_at", nullable = false, updatable = false)
     private Instant submittedAt;
-
-    @Version
-    private Long version;
 
     protected Intent() {
     }
 
-    public Intent(Long productId, String name, String phone, String codeHash, IntentStatus status, Instant submittedAt) {
+    public Intent(Long productId, String name, String phone, String codeHash, Instant submittedAt) {
         this.productId = productId;
         this.name = name;
         this.phone = phone;
         this.codeHash = codeHash;
-        this.status = status == null ? IntentStatus.WAITING : status;
-        this.submittedAt = submittedAt == null ? Instant.now() : submittedAt;
+        this.status = IntentStatus.WAITING;
+        this.submittedAt = submittedAt;
     }
 
-    public Long getId() {
-        return id;
+    @PrePersist
+    protected void onCreate() {
+        if (status == null) {
+            status = IntentStatus.WAITING;
+        }
     }
 
-    public Long getProductId() {
-        return productId;
+    /** 买家凭口令码修改姓名/电话（仅排队中允许），不改变排队位次。 */
+    public void updateContact(String name, String phone) {
+        this.name = name;
+        this.phone = phone;
     }
 
-    public String getName() {
-        return name;
+    /** 买家撤销意向，终态留痕。 */
+    public void cancel() {
+        this.status = IntentStatus.CANCELLED;
     }
 
-    public String getPhone() {
-        return phone;
+    /** 卖家选定该买家，进入交易。 */
+    public void markInTrade() {
+        this.status = IntentStatus.IN_TRADE;
     }
 
-    public String getCodeHash() {
-        return codeHash;
+    /** 交易成功（终态）。 */
+    public void markTraded() {
+        this.status = IntentStatus.TRADED;
     }
 
-    public IntentStatus getStatus() {
-        return status;
+    /** 交易失败（终态）。 */
+    public void markFailed() {
+        this.status = IntentStatus.FAILED;
     }
 
-    public void setStatus(IntentStatus status) {
-        this.status = status;
-    }
+    public Long getId() { return id; }
+    public Long getProductId() { return productId; }
+    public String getName() { return name; }
+    public String getPhone() { return phone; }
+    public String getCodeHash() { return codeHash; }
+    public IntentStatus getStatus() { return status; }
+    public Instant getSubmittedAt() { return submittedAt; }
 
-    public Instant getSubmittedAt() {
-        return submittedAt;
-    }
-
-    public Long getVersion() {
-        return version;
-    }
+    /** 供账号域只读聚合等场景直接构造视图使用，不影响持久化状态。 */
+    public void setStatus(IntentStatus status) { this.status = status; }
 }
